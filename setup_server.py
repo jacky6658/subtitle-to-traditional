@@ -66,14 +66,23 @@ def add_to_path(directory):
 
 def run_winget(pkg_id):
     log(f"winget install {pkg_id}")
-    result = subprocess.run(
-        ["winget", "install", "-e", "--id", pkg_id,
-         "--silent", "--accept-package-agreements", "--accept-source-agreements"],
-        capture_output=True, text=True, timeout=300
-    )
-    log(f"winget exit={result.returncode} stdout={result.stdout[-200:]} stderr={result.stderr[-200:]}")
-    # 0 = success, 0x8A150101 = already installed — both are fine
-    return result.returncode in (0, -1978335999, 0x8A150101)
+    try:
+        result = subprocess.run(
+            ["winget", "install", "-e", "--id", pkg_id,
+             "--silent", "--accept-package-agreements", "--accept-source-agreements"],
+            capture_output=True, timeout=300
+        )
+        stdout = (result.stdout or b"").decode("utf-8", errors="replace")[-200:]
+        stderr = (result.stderr or b"").decode("utf-8", errors="replace")[-200:]
+        log(f"winget exit={result.returncode} stdout={stdout} stderr={stderr}")
+        # 0 = success, 0x8A150101 / -1978335999 = already installed
+        return result.returncode in (0, -1978335999, 0x8A150101)
+    except FileNotFoundError:
+        log("winget not found")
+        return False
+    except Exception as e:
+        log(f"winget error: {e}")
+        return False
 
 def run_setup():
     try:
