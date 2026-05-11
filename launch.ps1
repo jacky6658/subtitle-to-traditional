@@ -40,7 +40,39 @@ function WaitForPort($port) {
     return $false
 }
 
-Log "=== Starting subtitle converter ==="
+function CreateDesktopShortcut {
+    $shortcutPath = "$env:USERPROFILE\Desktop\AIJobvideo.lnk"
+    $vbsPath      = Join-Path $dir "AIJobvideo.vbs"
+
+    # Try to generate logo.ico from logo.png using Python+Pillow
+    $icoPath = Join-Path $dir "logo.ico"
+    if (-not (Test-Path $icoPath)) {
+        $py = FindPython
+        if ($py) {
+            $pyCode = "
+try:
+    from PIL import Image
+    img = Image.open(r'$(Join-Path $dir 'logo.png')')
+    img.save(r'$icoPath', format='ICO', sizes=[(256,256),(64,64),(32,32),(16,16)])
+except Exception:
+    pass
+"
+            & $py -c $pyCode 2>$null
+        }
+    }
+
+    $WshShell = New-Object -comObject WScript.Shell
+    $sc = $WshShell.CreateShortcut($shortcutPath)
+    $sc.TargetPath       = "wscript.exe"
+    $sc.Arguments        = "`"$vbsPath`""
+    $sc.WorkingDirectory = $dir
+    $sc.Description      = "AIJobvideo 字幕轉繁體工具"
+    if (Test-Path $icoPath) { $sc.IconLocation = "$icoPath,0" }
+    $sc.Save()
+    Log "Desktop shortcut created: $shortcutPath"
+}
+
+Log "=== Starting AIJobvideo ==="
 
 # Already installed - start main server
 if (Test-Path $marker) {
@@ -54,8 +86,9 @@ if (Test-Path $marker) {
     Start-Process $python -ArgumentList "`"$(Join-Path $dir 'server.py')`"" -WindowStyle Hidden
     Log "Waiting for server..."
     if (WaitForPort 8765) {
+        CreateDesktopShortcut
         Start-Process "http://127.0.0.1:8765"
-        Log "Tool opened. Close this window to stop."
+        Log "Tool opened."
     } else {
         Write-Host "Server failed to start. Check setup.log" -ForegroundColor Red
     }
@@ -70,10 +103,10 @@ $python = FindPython
 if (-not $python) {
     Log "Python not found, installing via winget..."
     winget install -e --id Python.Python.3.12 --silent --accept-package-agreements --accept-source-agreements
-    $pyDir = "$env:LOCALAPPDATA\Programs\Python\Python312"
+    $pyDir     = "$env:LOCALAPPDATA\Programs\Python\Python312"
     $pyScripts = "$env:LOCALAPPDATA\Programs\Python\Python312\Scripts"
-    $env:PATH = "$pyDir;$pyScripts;$env:PATH"
-    $python = FindPython
+    $env:PATH  = "$pyDir;$pyScripts;$env:PATH"
+    $python    = FindPython
     if (-not $python) {
         Write-Host "Python install failed. Download from https://www.python.org" -ForegroundColor Red
         Read-Host "Press Enter to close"
@@ -110,6 +143,7 @@ Start-Process $python2 -ArgumentList "`"$(Join-Path $dir 'server.py')`"" -Window
 
 Log "Waiting for main server..."
 if (WaitForPort 8765) {
+    CreateDesktopShortcut
     Start-Process "http://127.0.0.1:8765"
     Log "Tool opened!"
 } else {
