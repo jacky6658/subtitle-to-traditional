@@ -44,19 +44,12 @@ function CreateDesktopShortcut {
     $shortcutPath = "$env:USERPROFILE\Desktop\AIJobvideo.lnk"
     $vbsPath      = Join-Path $dir "AIJobvideo.vbs"
 
-    # Try to generate logo.ico from logo.png using Python+Pillow
     $icoPath = Join-Path $dir "logo.ico"
     if (-not (Test-Path $icoPath)) {
         $py = FindPython
         if ($py) {
-            $pyCode = "
-try:
-    from PIL import Image
-    img = Image.open(r'$(Join-Path $dir 'logo.png')')
-    img.save(r'$icoPath', format='ICO', sizes=[(256,256),(64,64),(32,32),(16,16)])
-except Exception:
-    pass
-"
+            $pngPath = Join-Path $dir "logo.png"
+            $pyCode  = "try:`n    from PIL import Image`n    Image.open(r'" + $pngPath + "').save(r'" + $icoPath + "', format='ICO', sizes=[(256,256),(64,64),(32,32),(16,16)])`nexcept Exception:`n    pass"
             & $py -c $pyCode 2>$null
         }
     }
@@ -66,15 +59,16 @@ except Exception:
     $sc.TargetPath       = "wscript.exe"
     $sc.Arguments        = "`"$vbsPath`""
     $sc.WorkingDirectory = $dir
-    $sc.Description      = "AIJobvideo 字幕轉繁體工具"
-    if (Test-Path $icoPath) { $sc.IconLocation = "$icoPath,0" }
+    $sc.Description      = "AIJobvideo"
+    if (Test-Path $icoPath) {
+        $sc.IconLocation = $icoPath + ",0"
+    }
     $sc.Save()
-    Log "Desktop shortcut created: $shortcutPath"
+    Log "Desktop shortcut created"
 }
 
 Log "=== Starting AIJobvideo ==="
 
-# Already installed - start main server
 if (Test-Path $marker) {
     Log "Already installed, starting main server..."
     $python = FindPython
@@ -83,7 +77,7 @@ if (Test-Path $marker) {
         Read-Host "Press Enter to close"
         exit 1
     }
-    Start-Process $python -ArgumentList "`"$(Join-Path $dir 'server.py')`"" -WindowStyle Hidden
+    Start-Process $python -ArgumentList ("`"" + (Join-Path $dir "server.py") + "`"") -WindowStyle Hidden
     Log "Waiting for server..."
     if (WaitForPort 8765) {
         CreateDesktopShortcut
@@ -96,7 +90,6 @@ if (Test-Path $marker) {
     exit 0
 }
 
-# First run
 Log "First run - checking environment..."
 
 $python = FindPython
@@ -105,7 +98,7 @@ if (-not $python) {
     winget install -e --id Python.Python.3.12 --silent --accept-package-agreements --accept-source-agreements
     $pyDir     = "$env:LOCALAPPDATA\Programs\Python\Python312"
     $pyScripts = "$env:LOCALAPPDATA\Programs\Python\Python312\Scripts"
-    $env:PATH  = "$pyDir;$pyScripts;$env:PATH"
+    $env:PATH  = $pyDir + ";" + $pyScripts + ";" + $env:PATH
     $python    = FindPython
     if (-not $python) {
         Write-Host "Python install failed. Download from https://www.python.org" -ForegroundColor Red
@@ -117,7 +110,7 @@ Log "Python: $python"
 
 Log "Starting setup wizard server..."
 $setupScript = Join-Path $dir "setup_server.py"
-Start-Process $python -ArgumentList "`"$setupScript`"" -WindowStyle Hidden
+Start-Process $python -ArgumentList ("`"" + $setupScript + "`"") -WindowStyle Hidden
 
 Log "Waiting for setup wizard..."
 if (WaitForPort 8766) {
@@ -139,7 +132,7 @@ Log ""
 Log "Installation complete! Starting main server..."
 
 $python2 = FindPython
-Start-Process $python2 -ArgumentList "`"$(Join-Path $dir 'server.py')`"" -WindowStyle Hidden
+Start-Process $python2 -ArgumentList ("`"" + (Join-Path $dir "server.py") + "`"") -WindowStyle Hidden
 
 Log "Waiting for main server..."
 if (WaitForPort 8765) {
