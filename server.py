@@ -272,7 +272,8 @@ def download(job_id: str):
     return FileResponse(job['output_path'], media_type='video/mp4', filename='output_繁體字幕.mp4')
 
 
-GITHUB_RAW = 'https://raw.githubusercontent.com/jacky6658/subtitle-to-traditional/main'
+GITHUB_RAW  = 'https://raw.githubusercontent.com/jacky6658/subtitle-to-traditional/main'
+GITHUB_API  = 'https://api.github.com/repos/jacky6658/subtitle-to-traditional/contents'
 LOCAL_VERSION_FILE = os.path.join(BASE_DIR, 'version.json')
 
 def get_local_version():
@@ -283,11 +284,24 @@ def get_local_version():
         return '0.0.0'
 
 
+def _fetch_remote_version():
+    """Fetch version.json via GitHub API (bypasses CDN cache)."""
+    import base64
+    req = urllib.request.Request(
+        f'{GITHUB_API}/version.json',
+        headers={'Accept': 'application/vnd.github.v3+json',
+                 'User-Agent': 'AIJobvideo-updater/1.0'}
+    )
+    with urllib.request.urlopen(req, timeout=10, context=_ssl_ctx) as r:
+        api_data = json.loads(r.read())
+    content = base64.b64decode(api_data['content']).decode('utf-8')
+    return json.loads(content)
+
+
 @app.get('/api/check-update')
 def check_update():
     try:
-        with urllib.request.urlopen(f'{GITHUB_RAW}/version.json', timeout=8, context=_ssl_ctx) as r:
-            remote = json.loads(r.read())
+        remote = _fetch_remote_version()
         local_ver = get_local_version()
         return JSONResponse({
             'local': local_ver,
@@ -303,8 +317,7 @@ def check_update():
 @app.post('/api/do-update')
 def do_update():
     try:
-        with urllib.request.urlopen(f'{GITHUB_RAW}/version.json', timeout=8, context=_ssl_ctx) as r:
-            remote = json.loads(r.read())
+        remote = _fetch_remote_version()
         needs_restart = False
         for fname in remote.get('files', []):
             with urllib.request.urlopen(f'{GITHUB_RAW}/{fname}', timeout=30, context=_ssl_ctx) as r:
