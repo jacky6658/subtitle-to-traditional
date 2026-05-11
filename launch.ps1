@@ -29,6 +29,11 @@ function FindPython {
     return $null
 }
 
+function DepsInstalled($python) {
+    $result = & $python -c "import faster_whisper, cv2, PIL, zhconv, fastapi, uvicorn; print('ok')" 2>&1
+    return ($result -match "ok")
+}
+
 function KillExistingServer {
     $conn = Get-NetTCPConnection -LocalPort 8765 -ErrorAction SilentlyContinue | Select-Object -First 1
     if ($conn) {
@@ -79,14 +84,18 @@ except Exception:
 
 Log "=== Starting AIJobvideo ==="
 
-if (Test-Path $marker) {
-    Log "Already installed, starting main server..."
-    $python = FindPython
+$python = FindPython
+
+# Check if already installed (marker file OR packages actually importable)
+if ((Test-Path $marker) -or ($python -and (DepsInstalled $python))) {
+    Log "Dependencies ready, starting server..."
     if (-not $python) {
         Write-Host "Python not found. Please reinstall." -ForegroundColor Red
         Read-Host "Press Enter to close"
         exit 1
     }
+    # Write marker so future runs skip the check
+    if (-not (Test-Path $marker)) { New-Item $marker -ItemType File | Out-Null }
     KillExistingServer
     Start-Process $python -ArgumentList "`"$(Join-Path $dir 'server.py')`"" -WindowStyle Hidden
     Log "Waiting for server..."
@@ -103,7 +112,6 @@ if (Test-Path $marker) {
 
 Log "First run - checking environment..."
 
-$python = FindPython
 if (-not $python) {
     Log "Python not found, installing via winget..."
     winget install -e --id Python.Python.3.12 --silent --accept-package-agreements --accept-source-agreements
