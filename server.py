@@ -86,18 +86,23 @@ def process_job(job_id: str, input_path: str, output_path: str):
 
         # ── 2. Whisper transcription ────────────────────────────────────
         job.update(stage='Whisper 辨識字幕中...', progress=0.08)
-        srt_dir = tempfile.mkdtemp()
-        subprocess.run(
-            ['whisper', input_path,
-             '--language', 'zh', '--model', 'medium',
-             '--output_format', 'srt', '--output_dir', srt_dir],
-            capture_output=True, text=True, check=True
-        )
-        srt_files = [f for f in os.listdir(srt_dir) if f.endswith('.srt')]
-        if not srt_files:
-            raise RuntimeError('Whisper 未產生字幕檔')
+        from faster_whisper import WhisperModel
+        model = WhisperModel('medium', device='cpu', compute_type='int8')
+        segments, _ = model.transcribe(input_path, language='zh')
 
-        srt_raw = open(os.path.join(srt_dir, srt_files[0]), encoding='utf-8').read()
+        # Build SRT from segments
+        def fmt_ts(s):
+            h = int(s // 3600); m = int((s % 3600) // 60)
+            sec = int(s % 60); ms = int((s % 1) * 1000)
+            return f"{h:02d}:{m:02d}:{sec:02d},{ms:03d}"
+
+        srt_lines = []
+        for i, seg in enumerate(segments, 1):
+            srt_lines.append(str(i))
+            srt_lines.append(f"{fmt_ts(seg.start)} --> {fmt_ts(seg.end)}")
+            srt_lines.append(seg.text.strip())
+            srt_lines.append("")
+        srt_raw = "\n".join(srt_lines)
 
         # ── 3. Convert to Traditional Chinese ──────────────────────────
         job.update(stage='轉換繁體中文...', progress=0.36)

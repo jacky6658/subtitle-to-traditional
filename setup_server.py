@@ -117,19 +117,20 @@ def run_setup():
                 add_to_path(d)
 
         # ── Step 3: Python packages ─────────────────────────────────────
-        set_status("packages", "安裝套件（約 1-3 分鐘）...", 55)
+        set_status("packages", "安裝套件（約 3-5 分鐘）...", 55)
         pkgs = ["fastapi", "uvicorn", "python-multipart",
-                "opencv-python-headless", "pillow", "numpy", "zhconv", "openai-whisper"]
+                "opencv-python-headless", "pillow", "numpy", "zhconv", "faster-whisper"]
         r = subprocess.run(
             [python, "-m", "pip", "install", "-q"] + pkgs,
-            capture_output=True, text=True, timeout=3600
+            capture_output=True, text=True, timeout=1800
         )
         log(f"pip exit={r.returncode} err={r.stderr[-300:]}")
 
         # ── Step 4: Download Whisper model ──────────────────────────────
-        set_status("whisper", "下載語音模型（約 1.5GB，請稍候）...", 75)
+        set_status("whisper", "下載語音模型（約 600MB，請稍候）...", 75)
         r = subprocess.run(
-            [python, "-c", "import whisper; whisper.load_model('medium')"],
+            [python, "-c",
+             "from faster_whisper import WhisperModel; WhisperModel('medium', device='cpu', compute_type='int8')"],
             capture_output=True, text=True, timeout=1800
         )
         log(f"whisper exit={r.returncode} err={r.stderr[-300:]}")
