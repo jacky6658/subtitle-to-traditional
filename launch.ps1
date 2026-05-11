@@ -29,6 +29,15 @@ function FindPython {
     return $null
 }
 
+function KillExistingServer {
+    $conn = Get-NetTCPConnection -LocalPort 8765 -ErrorAction SilentlyContinue | Select-Object -First 1
+    if ($conn) {
+        Stop-Process -Id $conn.OwningProcess -Force -ErrorAction SilentlyContinue
+        Start-Sleep 1
+        Log "Killed existing server"
+    }
+}
+
 function WaitForPort($port) {
     for ($i = 0; $i -lt 60; $i++) {
         Start-Sleep 1
@@ -42,27 +51,28 @@ function WaitForPort($port) {
 
 function CreateDesktopShortcut {
     $shortcutPath = "$env:USERPROFILE\Desktop\AIJobvideo.lnk"
-    $vbsPath      = Join-Path $dir "AIJobvideo.vbs"
-
+    $vbsPath = Join-Path $dir "AIJobvideo.vbs"
     $icoPath = Join-Path $dir "logo.ico"
     if (-not (Test-Path $icoPath)) {
         $py = FindPython
         if ($py) {
             $pngPath = Join-Path $dir "logo.png"
-            $pyCode  = "try:`n    from PIL import Image`n    Image.open(r'" + $pngPath + "').save(r'" + $icoPath + "', format='ICO', sizes=[(256,256),(64,64),(32,32),(16,16)])`nexcept Exception:`n    pass"
-            & $py -c $pyCode 2>$null
+            & $py -c "
+try:
+    from PIL import Image
+    Image.open(r'$pngPath').save(r'$icoPath', format='ICO', sizes=[(256,256),(64,64),(32,32)])
+except Exception:
+    pass
+" 2>$null
         }
     }
-
-    $WshShell = New-Object -comObject WScript.Shell
-    $sc = $WshShell.CreateShortcut($shortcutPath)
-    $sc.TargetPath       = "wscript.exe"
-    $sc.Arguments        = "`"$vbsPath`""
+    $ws = New-Object -comObject WScript.Shell
+    $sc = $ws.CreateShortcut($shortcutPath)
+    $sc.TargetPath = "wscript.exe"
+    $sc.Arguments = "`"$vbsPath`""
     $sc.WorkingDirectory = $dir
-    $sc.Description      = "AIJobvideo"
-    if (Test-Path $icoPath) {
-        $sc.IconLocation = $icoPath + ",0"
-    }
+    $sc.Description = "AIJobvideo"
+    if (Test-Path $icoPath) { $sc.IconLocation = $icoPath + ",0" }
     $sc.Save()
     Log "Desktop shortcut created"
 }
@@ -77,7 +87,8 @@ if (Test-Path $marker) {
         Read-Host "Press Enter to close"
         exit 1
     }
-    Start-Process $python -ArgumentList ("`"" + (Join-Path $dir "server.py") + "`"") -WindowStyle Hidden
+    KillExistingServer
+    Start-Process $python -ArgumentList "`"$(Join-Path $dir 'server.py')`"" -WindowStyle Hidden
     Log "Waiting for server..."
     if (WaitForPort 8765) {
         CreateDesktopShortcut
@@ -96,10 +107,10 @@ $python = FindPython
 if (-not $python) {
     Log "Python not found, installing via winget..."
     winget install -e --id Python.Python.3.12 --silent --accept-package-agreements --accept-source-agreements
-    $pyDir     = "$env:LOCALAPPDATA\Programs\Python\Python312"
+    $pyDir = "$env:LOCALAPPDATA\Programs\Python\Python312"
     $pyScripts = "$env:LOCALAPPDATA\Programs\Python\Python312\Scripts"
-    $env:PATH  = $pyDir + ";" + $pyScripts + ";" + $env:PATH
-    $python    = FindPython
+    $env:PATH = "$pyDir;$pyScripts;$env:PATH"
+    $python = FindPython
     if (-not $python) {
         Write-Host "Python install failed. Download from https://www.python.org" -ForegroundColor Red
         Read-Host "Press Enter to close"
@@ -110,12 +121,12 @@ Log "Python: $python"
 
 Log "Starting setup wizard server..."
 $setupScript = Join-Path $dir "setup_server.py"
-Start-Process $python -ArgumentList ("`"" + $setupScript + "`"") -WindowStyle Hidden
+Start-Process $python -ArgumentList "`"$setupScript`"" -WindowStyle Hidden
 
 Log "Waiting for setup wizard..."
 if (WaitForPort 8766) {
     Start-Process "http://127.0.0.1:8766"
-    Log "Setup wizard opened in browser. Follow the instructions."
+    Log "Setup wizard opened."
 } else {
     Write-Host "Setup wizard failed to start. Check setup.log" -ForegroundColor Red
     Read-Host "Press Enter to close"
@@ -130,9 +141,9 @@ while (-not (Test-Path $marker)) {
 
 Log ""
 Log "Installation complete! Starting main server..."
-
 $python2 = FindPython
-Start-Process $python2 -ArgumentList ("`"" + (Join-Path $dir "server.py") + "`"") -WindowStyle Hidden
+KillExistingServer
+Start-Process $python2 -ArgumentList "`"$(Join-Path $dir 'server.py')`"" -WindowStyle Hidden
 
 Log "Waiting for main server..."
 if (WaitForPort 8765) {
