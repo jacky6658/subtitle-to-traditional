@@ -122,7 +122,7 @@ def run_setup():
                 "opencv-python-headless", "pillow", "numpy", "zhconv", "openai-whisper"]
         r = subprocess.run(
             [python, "-m", "pip", "install", "-q"] + pkgs,
-            capture_output=True, text=True, timeout=600
+            capture_output=True, text=True, timeout=3600
         )
         log(f"pip exit={r.returncode} err={r.stderr[-300:]}")
 
