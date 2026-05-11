@@ -1,1 +1,1 @@
-{"version": "1.0.1", "changelog": "・桌面捷徑：安裝完自動建立 AIJobvideo 桌面圖示\n・修正返回主頁按鈕無法點擊問題\n・修正更新檢查失敗問題\n・新增回報錯誤 / 意見箱表單", "files": ["home.html", "index.html", "server.py", "launch.ps1", "AIJobvideo.vbs"]}
+{"version": "1.0.2", "changelog": "・修正每次開啟都重新安裝的問題", "files": ["home.html", "index.html", "server.py", "launch.ps1", "AIJobvideo.vbs"]}
