@@ -103,5 +103,17 @@ while (-not (Test-Path $marker)) {
 }
 
 Log ""
-Log "Installation complete!"
+Log "Installation complete! Starting main server..."
+
+$python2 = FindPython
+Start-Process $python2 -ArgumentList "`"$(Join-Path $dir 'server.py')`"" -WindowStyle Hidden
+
+Log "Waiting for main server..."
+if (WaitForPort 8765) {
+    Start-Process "http://127.0.0.1:8765"
+    Log "Tool opened!"
+} else {
+    Write-Host "Server failed to start. Check setup.log" -ForegroundColor Red
+}
+
 Read-Host "Press Enter to close"
