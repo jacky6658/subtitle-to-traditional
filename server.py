@@ -1,5 +1,13 @@
-import os, re, uuid, threading, tempfile, subprocess, json, sys
+import os, re, uuid, threading, tempfile, subprocess, json, sys, ssl
 import urllib.request
+
+_ssl_ctx = ssl.create_default_context()
+try:
+    import certifi
+    _ssl_ctx = ssl.create_default_context(cafile=certifi.where())
+except Exception:
+    _ssl_ctx.check_hostname = False
+    _ssl_ctx.verify_mode = ssl.CERT_NONE
 import numpy as np
 import cv2
 from PIL import Image, ImageDraw, ImageFont
@@ -278,7 +286,7 @@ def get_local_version():
 @app.get('/api/check-update')
 def check_update():
     try:
-        with urllib.request.urlopen(f'{GITHUB_RAW}/version.json', timeout=8) as r:
+        with urllib.request.urlopen(f'{GITHUB_RAW}/version.json', timeout=8, context=_ssl_ctx) as r:
             remote = json.loads(r.read())
         local_ver = get_local_version()
         return JSONResponse({
@@ -286,6 +294,7 @@ def check_update():
             'remote': remote['version'],
             'has_update': remote['version'] != local_ver,
             'files': remote.get('files', []),
+            'changelog': remote.get('changelog', ''),
         })
     except Exception as e:
         return JSONResponse({'error': str(e)}, status_code=500)
@@ -294,11 +303,11 @@ def check_update():
 @app.post('/api/do-update')
 def do_update():
     try:
-        with urllib.request.urlopen(f'{GITHUB_RAW}/version.json', timeout=8) as r:
+        with urllib.request.urlopen(f'{GITHUB_RAW}/version.json', timeout=8, context=_ssl_ctx) as r:
             remote = json.loads(r.read())
         needs_restart = False
         for fname in remote.get('files', []):
-            with urllib.request.urlopen(f'{GITHUB_RAW}/{fname}', timeout=30) as r:
+            with urllib.request.urlopen(f'{GITHUB_RAW}/{fname}', timeout=30, context=_ssl_ctx) as r:
                 content = r.read()
             with open(os.path.join(BASE_DIR, fname), 'wb') as f:
                 f.write(content)
