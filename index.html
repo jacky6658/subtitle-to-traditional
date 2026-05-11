@@ -306,6 +306,7 @@
     <div class="drop-title">拖曳影片到這裡，或點擊選擇</div>
     <div class="drop-sub">自動辨識字幕位置・繁體轉換・無損輸出</div>
     <span class="drop-tag">MP4 · MOV · MKV · AVI</span>
+    <span class="drop-tag" style="margin-top:6px; background:rgba(220,38,38,0.08); border-color:rgba(220,38,38,0.3); color:#dc2626;">⏱ 限制：影片長度不超過 1 分鐘</span>
   </div>
 
   <!-- File Info -->
@@ -365,7 +366,11 @@
 
 </div>
 
-<footer>本工具在您的電腦上執行，影片不會上傳至任何伺服器</footer>
+<footer>
+  本工具在您的電腦上執行，影片不會上傳至任何伺服器
+  <span style="margin-left:12px; color:#94a3b8;">·</span>
+  <button onclick="localStorage.removeItem('aijob_tour_v1'); tourStart();" style="margin-left:12px; background:none; border:none; color:#94a3b8; font-size:12px; cursor:pointer; text-decoration:underline; padding:0;">重看新手導覽</button>
+</footer>
 
 <script>
 const dropzone = document.getElementById('dropzone');
@@ -522,11 +527,34 @@ async function showResult(jobId) {
   startBtn.innerHTML = '<span>再轉一支</span>';
 }
 
+let _lastErrorMsg = '';
+
 function showError(msg) {
+  _lastErrorMsg = msg;
   errorSection.style.display = 'block';
-  errorSection.textContent = '⚠️ ' + msg;
+  errorSection.innerHTML = '⚠️ ' + msg +
+    ' <button onclick="reportError()" style="margin-left:10px;background:#ef4444;color:#fff;border:none;border-radius:6px;padding:3px 10px;font-size:12px;cursor:pointer;">回報錯誤</button>';
   progressSection.style.display = 'none';
   startBtn.innerHTML = '<span>重新開始</span>';
+}
+
+async function reportError() {
+  const info = [
+    '錯誤訊息：' + _lastErrorMsg,
+    'OS：' + navigator.platform,
+    'UA：' + navigator.userAgent,
+    '時間：' + new Date().toLocaleString('zh-TW'),
+  ].join('\n');
+  try {
+    await fetch('https://api.telegram.org/bot8284901200:AAE0o9f6EVx6WRPGuhXM1IGli1YVhD3--wc/sendMessage', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ chat_id: '8365775688', text: '🛑 字幕轉繁體工具錯誤回報\n\n' + info }),
+    });
+    alert('已送出錯誤回報，謝謝！');
+  } catch (e) {
+    alert('回報失敗，請截圖後聯繫客服。');
+  }
 }
 </script>
 
@@ -631,7 +659,7 @@ const tourSteps = [
     title: '② 點擊開始轉換',
     desc: '上傳影片後，點擊此按鈕。工具會自動辨識字幕位置、去除舊字幕、加上繁體新字幕。',
     target: '#start-btn',
-    arrow: 'top'
+    arrow: 'bottom'
   },
   {
     title: '③ 預覽並下載',
