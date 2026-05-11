@@ -264,6 +264,10 @@ def download(job_id: str):
 
 
 @app.get('/')
+def home():
+    return FileResponse(os.path.join(BASE_DIR, 'home.html'))
+
+@app.get('/tool')
 def index():
     return FileResponse(os.path.join(BASE_DIR, 'index.html'))
 
