@@ -56,6 +56,62 @@
     color: var(--text-sub);
   }
 
+  /* ── 更新區塊 ── */
+  .update-bar {
+    margin-top: 18px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    flex-wrap: wrap;
+  }
+
+  #version-label {
+    font-size: 12px;
+    color: #94a3b8;
+  }
+
+  #update-btn {
+    background: none;
+    border: 1.5px solid var(--border);
+    border-radius: 8px;
+    padding: 5px 14px;
+    font-size: 12px;
+    color: var(--text-sub);
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    transition: border-color 0.2s, color 0.2s;
+  }
+  #update-btn:hover { border-color: var(--accent); color: var(--accent); }
+  #update-btn:disabled { opacity: 0.5; cursor: default; }
+
+  #update-status {
+    font-size: 12px;
+    color: var(--text-sub);
+    display: none;
+  }
+  #update-status.ok { color: #059669; }
+  #update-status.new { color: var(--accent); }
+  #update-status.err { color: #dc2626; }
+
+  #do-update-btn {
+    background: var(--accent);
+    border: none;
+    border-radius: 8px;
+    padding: 5px 14px;
+    font-size: 12px;
+    color: #fff;
+    cursor: pointer;
+    display: none;
+    align-items: center;
+    gap: 6px;
+    transition: background 0.2s;
+  }
+  #do-update-btn:hover { background: var(--accent2); }
+
+  /* ── 工具卡片 ── */
   .tools-grid {
     display: grid;
     grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
@@ -88,19 +144,11 @@
     border-radius: 14px;
     background: linear-gradient(135deg, #2563eb, #1d4ed8);
     display: flex; align-items: center; justify-content: center;
-    font-size: 24px;
     box-shadow: 0 4px 14px var(--accent-glow);
   }
 
-  .tool-card h2 {
-    font-size: 17px;
-    font-weight: 700;
-  }
-  .tool-card p {
-    font-size: 13px;
-    color: var(--text-sub);
-    line-height: 1.6;
-  }
+  .tool-card h2 { font-size: 17px; font-weight: 700; }
+  .tool-card p { font-size: 13px; color: var(--text-sub); line-height: 1.6; }
 
   .tool-arrow {
     margin-top: auto;
@@ -127,10 +175,29 @@
 
 <header>
   <div class="logo">
-    <img src="logo.png" alt="AIJob">
+    <img src="/static/logo.png" alt="AIJob">
   </div>
   <h1>AIJob 工具箱</h1>
   <p>專為影音工作者打造的智能工具</p>
+
+  <div class="update-bar">
+    <span id="version-label">版本載入中...</span>
+    <button id="update-btn" onclick="checkUpdate()">
+      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+        <polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/>
+        <path d="M3.51 9a9 9 0 0114.13-3.36L23 10M1 14l5.36 5.36A9 9 0 0020.49 15"/>
+      </svg>
+      檢查更新
+    </button>
+    <span id="update-status"></span>
+    <button id="do-update-btn" onclick="doUpdate()">
+      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+        <polyline points="8 17 12 21 16 17"/><line x1="12" y1="12" x2="12" y2="21"/>
+        <path d="M20.88 18.09A5 5 0 0018 9h-1.26A8 8 0 103 16.29"/>
+      </svg>
+      立即更新
+    </button>
+  </div>
 </header>
 
 <div class="tools-grid">
@@ -159,5 +226,73 @@
   未經授權，嚴禁轉售、二次販售或轉讓本工具
 </footer>
 
+<script>
+const statusEl = document.getElementById('update-status');
+const doBtn = document.getElementById('do-update-btn');
+const updateBtn = document.getElementById('update-btn');
+const verLabel = document.getElementById('version-label');
+
+async function loadVersion() {
+  try {
+    const r = await fetch('/api/check-update');
+    const d = await r.json();
+    if (d.error) { verLabel.textContent = '版本：未知'; return; }
+    verLabel.textContent = `版本 ${d.local === '0.0.0' ? d.remote : d.local}`;
+  } catch { verLabel.textContent = '版本：未知'; }
+}
+
+async function checkUpdate() {
+  updateBtn.disabled = true;
+  statusEl.className = '';
+  statusEl.style.display = 'inline';
+  statusEl.textContent = '檢查中...';
+  doBtn.style.display = 'none';
+  try {
+    const r = await fetch('/api/check-update');
+    const d = await r.json();
+    if (d.error) throw new Error(d.error);
+    if (d.has_update) {
+      statusEl.className = 'new';
+      statusEl.textContent = `發現新版本 ${d.remote}！`;
+      doBtn.style.display = 'inline-flex';
+    } else {
+      statusEl.className = 'ok';
+      statusEl.textContent = '已是最新版本';
+    }
+  } catch (e) {
+    statusEl.className = 'err';
+    statusEl.textContent = '檢查失敗，請確認網路連線';
+  }
+  updateBtn.disabled = false;
+}
+
+async function doUpdate() {
+  doBtn.disabled = true;
+  updateBtn.disabled = true;
+  statusEl.className = '';
+  statusEl.textContent = '更新中，請稍候...';
+  try {
+    const r = await fetch('/api/do-update', { method: 'POST' });
+    const d = await r.json();
+    if (d.error) throw new Error(d.error);
+    statusEl.className = 'ok';
+    verLabel.textContent = `版本 ${d.version}`;
+    if (d.needs_restart) {
+      statusEl.textContent = `更新完成！伺服器重啟中，請稍後重新整理...`;
+      setTimeout(() => location.reload(), 4000);
+    } else {
+      statusEl.textContent = `更新完成！已升級至 ${d.version}`;
+      doBtn.style.display = 'none';
+    }
+  } catch (e) {
+    statusEl.className = 'err';
+    statusEl.textContent = '更新失敗：' + e.message;
+    doBtn.disabled = false;
+    updateBtn.disabled = false;
+  }
+}
+
+loadVersion();
+</script>
 </body>
 </html>

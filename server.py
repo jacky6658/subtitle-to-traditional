@@ -1,4 +1,5 @@
-import os, re, uuid, threading, tempfile, subprocess
+import os, re, uuid, threading, tempfile, subprocess, json, sys
+import urllib.request
 import numpy as np
 import cv2
 from PIL import Image, ImageDraw, ImageFont
@@ -261,6 +262,58 @@ def download(job_id: str):
     if not job or job['status'] != 'done':
         return JSONResponse({'error': '尚未完成'}, status_code=400)
     return FileResponse(job['output_path'], media_type='video/mp4', filename='output_繁體字幕.mp4')
+
+
+GITHUB_RAW = 'https://raw.githubusercontent.com/jacky6658/subtitle-to-traditional/main'
+LOCAL_VERSION_FILE = os.path.join(BASE_DIR, 'version.json')
+
+def get_local_version():
+    try:
+        with open(LOCAL_VERSION_FILE, 'r') as f:
+            return json.load(f).get('version', '0.0.0')
+    except Exception:
+        return '0.0.0'
+
+
+@app.get('/api/check-update')
+def check_update():
+    try:
+        with urllib.request.urlopen(f'{GITHUB_RAW}/version.json', timeout=8) as r:
+            remote = json.loads(r.read())
+        local_ver = get_local_version()
+        return JSONResponse({
+            'local': local_ver,
+            'remote': remote['version'],
+            'has_update': remote['version'] != local_ver,
+            'files': remote.get('files', []),
+        })
+    except Exception as e:
+        return JSONResponse({'error': str(e)}, status_code=500)
+
+
+@app.post('/api/do-update')
+def do_update():
+    try:
+        with urllib.request.urlopen(f'{GITHUB_RAW}/version.json', timeout=8) as r:
+            remote = json.loads(r.read())
+        needs_restart = False
+        for fname in remote.get('files', []):
+            with urllib.request.urlopen(f'{GITHUB_RAW}/{fname}', timeout=30) as r:
+                content = r.read()
+            with open(os.path.join(BASE_DIR, fname), 'wb') as f:
+                f.write(content)
+            if fname == 'server.py':
+                needs_restart = True
+        with open(LOCAL_VERSION_FILE, 'w') as f:
+            json.dump({'version': remote['version']}, f)
+        if needs_restart:
+            def _restart():
+                import time; time.sleep(2)
+                os.execv(sys.executable, [sys.executable] + sys.argv)
+            threading.Thread(target=_restart, daemon=True).start()
+        return JSONResponse({'ok': True, 'version': remote['version'], 'needs_restart': needs_restart})
+    except Exception as e:
+        return JSONResponse({'error': str(e)}, status_code=500)
 
 
 @app.get('/')
