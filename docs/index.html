@@ -1,0 +1,389 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>AIJobvideo — 字幕轉繁體工具</title>
+  <meta name="description" content="自動辨識影片簡體字幕，一鍵轉換為繁體中文並嵌回影片。所有運算在本機執行，影片不會上傳至任何伺服器。" />
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --brand: #2563eb;
+      --brand-dark: #1d4ed8;
+      --brand-light: #eff6ff;
+      --text: #0f172a;
+      --muted: #64748b;
+      --border: #e2e8f0;
+      --bg: #f8fafc;
+      --white: #ffffff;
+      --radius: 14px;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang TC",
+                   "Noto Sans TC", sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      line-height: 1.6;
+    }
+
+    /* ── Nav ── */
+    nav {
+      position: sticky; top: 0; z-index: 100;
+      background: rgba(255,255,255,0.85);
+      backdrop-filter: blur(12px);
+      border-bottom: 1px solid var(--border);
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 0 32px; height: 60px;
+    }
+    .nav-logo { font-weight: 700; font-size: 17px; color: var(--brand); letter-spacing: -0.3px; }
+    .nav-dl {
+      background: var(--brand); color: #fff;
+      padding: 7px 18px; border-radius: 8px;
+      text-decoration: none; font-size: 14px; font-weight: 600;
+      transition: background 0.15s;
+    }
+    .nav-dl:hover { background: var(--brand-dark); }
+
+    /* ── Hero ── */
+    .hero {
+      text-align: center;
+      padding: 100px 24px 80px;
+      background: linear-gradient(160deg, #eff6ff 0%, #f8fafc 60%);
+    }
+    .badge {
+      display: inline-flex; align-items: center; gap: 6px;
+      background: var(--brand-light); color: var(--brand);
+      border: 1px solid #bfdbfe; border-radius: 999px;
+      font-size: 13px; font-weight: 600; padding: 4px 14px;
+      margin-bottom: 28px;
+    }
+    .badge svg { width: 14px; height: 14px; }
+    h1 {
+      font-size: clamp(32px, 6vw, 56px);
+      font-weight: 800; letter-spacing: -1.5px;
+      line-height: 1.1; margin-bottom: 20px;
+    }
+    h1 span { color: var(--brand); }
+    .hero-sub {
+      font-size: clamp(16px, 2.5vw, 20px);
+      color: var(--muted); max-width: 520px; margin: 0 auto 40px;
+    }
+    .dl-btn {
+      display: inline-flex; align-items: center; gap: 10px;
+      background: var(--brand); color: #fff;
+      padding: 16px 36px; border-radius: 12px;
+      text-decoration: none; font-size: 18px; font-weight: 700;
+      box-shadow: 0 4px 20px rgba(37,99,235,0.35);
+      transition: transform 0.15s, box-shadow 0.15s;
+    }
+    .dl-btn:hover { transform: translateY(-2px); box-shadow: 0 8px 28px rgba(37,99,235,0.4); }
+    .dl-btn svg { width: 22px; height: 22px; }
+    .platform-note {
+      margin-top: 14px; font-size: 13px; color: var(--muted);
+    }
+    .platform-note span {
+      display: inline-flex; align-items: center; gap: 4px;
+      margin: 0 6px;
+    }
+
+    /* ── Preview ── */
+    .preview {
+      max-width: 860px; margin: 0 auto;
+      padding: 0 24px 80px;
+      text-align: center;
+    }
+    .preview-card {
+      background: var(--white);
+      border: 1px solid var(--border);
+      border-radius: 20px;
+      overflow: hidden;
+      box-shadow: 0 8px 40px rgba(0,0,0,0.08);
+      padding: 40px 32px;
+    }
+    .preview-steps {
+      display: flex; flex-wrap: wrap; gap: 16px;
+      justify-content: center; margin-top: 8px;
+    }
+    .step {
+      flex: 1; min-width: 160px; max-width: 200px;
+      background: var(--bg); border-radius: 12px;
+      padding: 20px 16px; text-align: center;
+    }
+    .step-num {
+      width: 36px; height: 36px; border-radius: 50%;
+      background: var(--brand); color: #fff;
+      font-weight: 700; font-size: 16px;
+      display: flex; align-items: center; justify-content: center;
+      margin: 0 auto 12px;
+    }
+    .step p { font-size: 14px; color: var(--muted); margin-top: 6px; }
+    .step strong { font-size: 15px; display: block; }
+
+    /* ── Features ── */
+    .features {
+      max-width: 900px; margin: 0 auto;
+      padding: 0 24px 80px;
+    }
+    .section-title {
+      text-align: center; font-size: 28px; font-weight: 800;
+      letter-spacing: -0.5px; margin-bottom: 36px;
+    }
+    .feat-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+      gap: 16px;
+    }
+    .feat-card {
+      background: var(--white); border: 1px solid var(--border);
+      border-radius: var(--radius); padding: 24px;
+    }
+    .feat-icon {
+      font-size: 28px; margin-bottom: 12px;
+    }
+    .feat-card h3 { font-size: 16px; margin-bottom: 6px; }
+    .feat-card p { font-size: 14px; color: var(--muted); }
+
+    /* ── Privacy ── */
+    .privacy-banner {
+      max-width: 700px; margin: 0 auto 80px;
+      padding: 0 24px;
+    }
+    .privacy-inner {
+      background: #f0fdf4; border: 1px solid #bbf7d0;
+      border-radius: var(--radius); padding: 24px 28px;
+      display: flex; align-items: flex-start; gap: 16px;
+    }
+    .privacy-inner svg { flex-shrink: 0; color: #16a34a; margin-top: 2px; }
+    .privacy-inner h3 { font-size: 16px; margin-bottom: 4px; color: #15803d; }
+    .privacy-inner p { font-size: 14px; color: #166534; }
+
+    /* ── Install ── */
+    .install {
+      max-width: 700px; margin: 0 auto 80px;
+      padding: 0 24px;
+    }
+    .install-tabs {
+      display: flex; gap: 8px; margin-bottom: 20px;
+    }
+    .tab-btn {
+      padding: 8px 20px; border-radius: 8px; border: 1px solid var(--border);
+      background: var(--white); font-size: 14px; font-weight: 600;
+      cursor: pointer; transition: all 0.15s;
+    }
+    .tab-btn.active {
+      background: var(--brand); color: #fff; border-color: var(--brand);
+    }
+    .tab-content { display: none; }
+    .tab-content.active { display: block; }
+    .steps-list {
+      background: var(--white); border: 1px solid var(--border);
+      border-radius: var(--radius); overflow: hidden;
+    }
+    .steps-list li {
+      display: flex; align-items: flex-start; gap: 14px;
+      padding: 16px 20px; border-bottom: 1px solid var(--border);
+      list-style: none; font-size: 15px;
+    }
+    .steps-list li:last-child { border-bottom: none; }
+    .sn {
+      flex-shrink: 0; width: 26px; height: 26px; border-radius: 50%;
+      background: var(--brand-light); color: var(--brand);
+      font-weight: 700; font-size: 13px;
+      display: flex; align-items: center; justify-content: center;
+    }
+    code {
+      background: #f1f5f9; border: 1px solid var(--border);
+      border-radius: 5px; padding: 1px 6px; font-size: 13px; font-family: monospace;
+    }
+
+    /* ── CTA ── */
+    .cta {
+      text-align: center; padding: 80px 24px 100px;
+      background: linear-gradient(160deg, #eff6ff 0%, #f8fafc 100%);
+    }
+    .cta h2 { font-size: 32px; font-weight: 800; margin-bottom: 12px; letter-spacing: -0.5px; }
+    .cta p { color: var(--muted); margin-bottom: 32px; font-size: 16px; }
+
+    /* ── Footer ── */
+    footer {
+      text-align: center; padding: 24px;
+      font-size: 13px; color: var(--muted);
+      border-top: 1px solid var(--border);
+    }
+
+    @media (max-width: 600px) {
+      nav { padding: 0 16px; }
+      .hero { padding: 72px 16px 60px; }
+    }
+  </style>
+</head>
+<body>
+
+<!-- Nav -->
+<nav>
+  <div class="nav-logo">AIJobvideo</div>
+  <a class="nav-dl" href="https://github.com/jacky6658/subtitle-to-traditional/releases/latest/download/AIJobvideo.zip">
+    免費下載
+  </a>
+</nav>
+
+<!-- Hero -->
+<section class="hero">
+  <div class="badge">
+    <svg viewBox="0 0 16 16" fill="currentColor"><path d="M8 0a8 8 0 1 0 0 16A8 8 0 0 0 8 0zm3.5 7.5h-3v-3a.5.5 0 0 0-1 0v3h-3a.5.5 0 0 0 0 1h3v3a.5.5 0 0 0 1 0v-3h3a.5.5 0 0 0 0-1z"/></svg>
+    完全免費 · 本機執行
+  </div>
+  <h1>簡體字幕<br><span>一鍵轉繁體</span></h1>
+  <p class="hero-sub">自動語音辨識影片內容，轉換為繁體中文字幕並嵌回影片，無需上傳影片到任何伺服器。</p>
+  <a class="dl-btn" href="https://github.com/jacky6658/subtitle-to-traditional/releases/latest/download/AIJobvideo.zip">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+      <polyline points="7 10 12 15 17 10"/>
+      <line x1="12" y1="15" x2="12" y2="3"/>
+    </svg>
+    立即免費下載
+  </a>
+  <p class="platform-note">
+    <span>🪟 Windows 10/11</span>
+    <span>🍎 macOS 12+</span>
+  </p>
+</section>
+
+<!-- How it works -->
+<div class="preview">
+  <div class="preview-card">
+    <p style="font-size:13px;color:var(--muted);margin-bottom:8px;text-transform:uppercase;letter-spacing:1px;font-weight:600;">使用流程</p>
+    <div class="preview-steps">
+      <div class="step">
+        <div class="step-num">1</div>
+        <strong>拖曳影片</strong>
+        <p>支援 MP4 / MOV / MKV / AVI</p>
+      </div>
+      <div class="step">
+        <div class="step-num">2</div>
+        <strong>點擊開始</strong>
+        <p>Whisper AI 自動辨識語音</p>
+      </div>
+      <div class="step">
+        <div class="step-num">3</div>
+        <strong>自動轉換</strong>
+        <p>簡體→繁體字幕嵌入影片</p>
+      </div>
+      <div class="step">
+        <div class="step-num">4</div>
+        <strong>下載成品</strong>
+        <p>取得 MP4 + SRT 字幕檔</p>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Features -->
+<section class="features">
+  <h2 class="section-title">功能特色</h2>
+  <div class="feat-grid">
+    <div class="feat-card">
+      <div class="feat-icon">🎙️</div>
+      <h3>AI 語音辨識</h3>
+      <p>採用 OpenAI Whisper medium 模型，中文辨識準確率高。</p>
+    </div>
+    <div class="feat-card">
+      <div class="feat-icon">🔄</div>
+      <h3>簡繁自動轉換</h3>
+      <p>辨識完成後自動將簡體中文字幕轉為繁體中文。</p>
+    </div>
+    <div class="feat-card">
+      <div class="feat-icon">📽️</div>
+      <h3>字幕嵌入影片</h3>
+      <p>自動偵測原字幕位置並覆蓋，輸出完整 MP4 影片。</p>
+    </div>
+    <div class="feat-card">
+      <div class="feat-icon">📄</div>
+      <h3>同步輸出 SRT</h3>
+      <p>同時產出 .srt 字幕檔，可用於任何影片播放器。</p>
+    </div>
+    <div class="feat-card">
+      <div class="feat-icon">🔔</div>
+      <h3>一鍵自動更新</h3>
+      <p>工具內建更新功能，點擊即可升級至最新版本。</p>
+    </div>
+    <div class="feat-card">
+      <div class="feat-icon">💻</div>
+      <h3>跨平台支援</h3>
+      <p>同時支援 Windows 10/11 及 macOS 12 以上版本。</p>
+    </div>
+  </div>
+</section>
+
+<!-- Privacy -->
+<div class="privacy-banner">
+  <div class="privacy-inner">
+    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
+    </svg>
+    <div>
+      <h3>完全本機執行，影片不會離開你的電腦</h3>
+      <p>所有 AI 運算皆在本機進行，影片、字幕內容均不會上傳至任何伺服器，請放心使用。</p>
+    </div>
+  </div>
+</div>
+
+<!-- Install -->
+<section class="install">
+  <h2 class="section-title">安裝說明</h2>
+  <div class="install-tabs">
+    <button class="tab-btn active" onclick="switchTab('win')">🪟 Windows</button>
+    <button class="tab-btn" onclick="switchTab('mac')">🍎 macOS</button>
+  </div>
+
+  <div id="tab-win" class="tab-content active">
+    <ul class="steps-list">
+      <li><div class="sn">1</div><div>點擊「立即免費下載」，下載 <code>AIJobvideo.zip</code></div></li>
+      <li><div class="sn">2</div><div>解壓縮到任意資料夾（例如桌面）</div></li>
+      <li><div class="sn">3</div><div>雙擊 <code>start.bat</code> — 首次執行會自動安裝所需套件（約 5–10 分鐘）</div></li>
+      <li><div class="sn">4</div><div>安裝完成後瀏覽器自動開啟工具，桌面自動建立 <strong>AIJobvideo</strong> 捷徑</div></li>
+      <li><div class="sn">5</div><div>之後每次點桌面捷徑即可直接開啟</div></li>
+    </ul>
+  </div>
+
+  <div id="tab-mac" class="tab-content">
+    <ul class="steps-list">
+      <li><div class="sn">1</div><div>點擊「立即免費下載」，下載 <code>AIJobvideo.zip</code></div></li>
+      <li><div class="sn">2</div><div>解壓縮後雙擊 <code>啟動.command</code></div></li>
+      <li><div class="sn">3</div><div>若提示「無法開啟」，請右鍵 → 打開 → 打開</div></li>
+      <li><div class="sn">4</div><div>瀏覽器自動開啟，即可使用</div></li>
+    </ul>
+  </div>
+</section>
+
+<!-- CTA -->
+<section class="cta">
+  <h2>立即開始使用</h2>
+  <p>免費下載，本機執行，無需帳號</p>
+  <a class="dl-btn" href="https://github.com/jacky6658/subtitle-to-traditional/releases/latest/download/AIJobvideo.zip">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+      <polyline points="7 10 12 15 17 10"/>
+      <line x1="12" y1="15" x2="12" y2="3"/>
+    </svg>
+    立即免費下載
+  </a>
+</section>
+
+<!-- Footer -->
+<footer>
+  © 2025 AIJobvideo．保留所有權利．未經授權嚴禁轉售
+</footer>
+
+<script>
+  function switchTab(t) {
+    document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+    document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+    document.getElementById('tab-' + t).classList.add('active');
+    event.target.classList.add('active');
+  }
+</script>
+</body>
+</html>
