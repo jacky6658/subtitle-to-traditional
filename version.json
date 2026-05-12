@@ -1,1 +1,1 @@
-{"version": "1.0.2", "changelog": "・修正每次開啟都重新安裝的問題", "files": ["home.html", "index.html", "server.py", "launch.ps1", "AIJobvideo.vbs"]}
+{"version": "1.0.3", "changelog": "・新增英文影片→繁體中文字幕功能\n・新增語言選擇器（中文／英文）\n・後台自動記錄每次轉換任務", "files": ["home.html", "index.html", "server.py", "launch.ps1", "AIJobvideo.vbs"]}

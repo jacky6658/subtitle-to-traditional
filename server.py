@@ -1,5 +1,5 @@
 import os, re, uuid, threading, tempfile, subprocess, json, sys, ssl
-import urllib.request
+import urllib.request, urllib.parse, datetime
 
 _ssl_ctx = ssl.create_default_context()
 try:
@@ -12,7 +12,7 @@ import numpy as np
 import cv2
 from PIL import Image, ImageDraw, ImageFont
 import zhconv
-from fastapi import FastAPI, UploadFile, File
+from fastapi import FastAPI, UploadFile, File, Form
 from fastapi.responses import FileResponse, JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
@@ -40,6 +40,31 @@ else:
     ]
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+
+TG_TOKEN = '8284901200:AAE0o9f6EVx6WRPGuhXM1IGli1YVhD3--wc'
+TG_CHAT  = '8365775688'
+
+def tg_log(msg: str):
+    try:
+        data = json.dumps({'chat_id': TG_CHAT, 'text': msg}).encode()
+        req = urllib.request.Request(
+            f'https://api.telegram.org/bot{TG_TOKEN}/sendMessage',
+            data=data, headers={'Content-Type': 'application/json'})
+        urllib.request.urlopen(req, timeout=5, context=_ssl_ctx)
+    except Exception:
+        pass
+
+def translate_to_zhtw(text: str) -> str:
+    try:
+        q = urllib.parse.quote(text)
+        url = (f'https://translate.googleapis.com/translate_a/single'
+               f'?client=gtx&sl=en&tl=zh-TW&dt=t&q={q}')
+        req = urllib.request.Request(url, headers={'User-Agent': 'Mozilla/5.0'})
+        with urllib.request.urlopen(req, timeout=10, context=_ssl_ctx) as r:
+            result = json.loads(r.read())
+        return ''.join(item[0] for item in result[0] if item[0])
+    except Exception:
+        return text
 
 app = FastAPI()
 app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"])
@@ -77,7 +102,7 @@ def to_traditional(text):
     return zhconv.convert(text, 'zh-tw')
 
 
-def process_job(job_id: str, input_path: str, output_path: str):
+def process_job(job_id: str, input_path: str, output_path: str, source_lang: str = 'zh'):
     job = jobs[job_id]
     try:
         # ── 1. Probe video ──────────────────────────────────────────────
@@ -93,11 +118,26 @@ def process_job(job_id: str, input_path: str, output_path: str):
         num, den = parts[2].split('/')
         fps = float(num) / float(den)
 
+        # 取得影片長度，發 Telegram 使用紀錄
+        dur_probe = subprocess.run(
+            ['ffprobe', '-v', 'error', '-show_entries', 'format=duration',
+             '-of', 'csv=p=0', input_path],
+            capture_output=True, text=True)
+        try:
+            dur = float(dur_probe.stdout.strip())
+            dur_str = f"{int(dur//60)}:{int(dur%60):02d}"
+        except Exception:
+            dur_str = '未知'
+        lang_label = {'zh': '中文', 'en': '英文'}.get(source_lang, source_lang)
+        now = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+        tg_log(f"📹 新轉換任務\n來源語言：{lang_label}\n影片長度：{dur_str}\n時間：{now}")
+
         # ── 2. Whisper transcription ────────────────────────────────────
+        whisper_lang = 'en' if source_lang == 'en' else 'zh'
         job.update(stage='Whisper 辨識字幕中...', progress=0.08)
         from faster_whisper import WhisperModel
         model = WhisperModel('medium', device='cpu', compute_type='int8')
-        segments, _ = model.transcribe(input_path, language='zh')
+        segments, _ = model.transcribe(input_path, language=whisper_lang)
 
         # Build SRT from segments
         def fmt_ts(s):
@@ -113,14 +153,23 @@ def process_job(job_id: str, input_path: str, output_path: str):
             srt_lines.append("")
         srt_raw = "\n".join(srt_lines)
 
-        # ── 3. Convert to Traditional Chinese ──────────────────────────
-        job.update(stage='轉換繁體中文...', progress=0.36)
-        lines_out = []
-        for line in srt_raw.split('\n'):
-            if re.match(r'^\d+$', line.strip()) or re.match(r'^\d{2}:\d{2}', line.strip()) or not line.strip():
-                lines_out.append(line)
-            else:
-                lines_out.append(to_traditional(line))
+        # ── 3. Convert / Translate to Traditional Chinese ──────────────
+        if source_lang == 'en':
+            job.update(stage='翻譯成繁體中文...', progress=0.36)
+            lines_out = []
+            for line in srt_raw.split('\n'):
+                if re.match(r'^\d+$', line.strip()) or re.match(r'^\d{2}:\d{2}', line.strip()) or not line.strip():
+                    lines_out.append(line)
+                else:
+                    lines_out.append(translate_to_zhtw(line))
+        else:
+            job.update(stage='轉換繁體中文...', progress=0.36)
+            lines_out = []
+            for line in srt_raw.split('\n'):
+                if re.match(r'^\d+$', line.strip()) or re.match(r'^\d{2}:\d{2}', line.strip()) or not line.strip():
+                    lines_out.append(line)
+                else:
+                    lines_out.append(to_traditional(line))
         srt_tw = '\n'.join(lines_out)
         subs = parse_srt(srt_tw)
 
@@ -220,18 +269,19 @@ def process_job(job_id: str, input_path: str, output_path: str):
         writer.wait()
 
         job.update(status='done', stage='完成！', progress=1.0)
+        tg_log(f"✅ 轉換完成\n語言：{lang_label}  長度：{dur_str}")
 
     except Exception as e:
+        tg_log(f"❌ 轉換失敗\n錯誤：{str(e)[:200]}")
         job.update(status='error', error=str(e), progress=0)
 
 
 # ── Routes ──────────────────────────────────────────────────────────────────
 
 @app.post('/process')
-async def start_process(video: UploadFile = File(...)):
+async def start_process(video: UploadFile = File(...), source_lang: str = Form('zh')):
     job_id = str(uuid.uuid4())
     tmp_dir = tempfile.mkdtemp()
-    # use simple ascii filename to avoid subprocess encoding issues
     input_path = os.path.join(tmp_dir, 'input.mp4')
     output_path = os.path.join(tmp_dir, 'output.mp4')
 
@@ -246,7 +296,7 @@ async def start_process(video: UploadFile = File(...)):
         'output_path': output_path,
         'error': None,
     }
-    t = threading.Thread(target=process_job, args=(job_id, input_path, output_path), daemon=True)
+    t = threading.Thread(target=process_job, args=(job_id, input_path, output_path, source_lang), daemon=True)
     t.start()
     return JSONResponse({'job_id': job_id})
 
