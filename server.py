@@ -102,7 +102,7 @@ def to_traditional(text):
     return zhconv.convert(text, 'zh-tw')
 
 
-def process_job(job_id: str, input_path: str, output_path: str, source_lang: str = 'zh'):
+def process_job(job_id: str, input_path: str, output_path: str, source_lang: str = 'zh', orig_filename: str = ''):
     job = jobs[job_id]
     try:
         # ── 1. Probe video ──────────────────────────────────────────────
@@ -130,7 +130,8 @@ def process_job(job_id: str, input_path: str, output_path: str, source_lang: str
             dur_str = '未知'
         lang_label = {'zh': '中文', 'en': '英文'}.get(source_lang, source_lang)
         now = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
-        tg_log(f"📹 新轉換任務\n來源語言：{lang_label}\n影片長度：{dur_str}\n時間：{now}")
+        fname = orig_filename or '未知'
+        tg_log(f"📹 新轉換任務\n檔案：{fname}\n語言：{lang_label}\n長度：{dur_str}\n時間：{now}")
 
         # ── 2. Whisper transcription ────────────────────────────────────
         whisper_lang = 'en' if source_lang == 'en' else 'zh'
@@ -269,10 +270,10 @@ def process_job(job_id: str, input_path: str, output_path: str, source_lang: str
         writer.wait()
 
         job.update(status='done', stage='完成！', progress=1.0)
-        tg_log(f"✅ 轉換完成\n語言：{lang_label}  長度：{dur_str}")
+        tg_log(f"✅ 轉換完成\n檔案：{fname}\n語言：{lang_label}  長度：{dur_str}")
 
     except Exception as e:
-        tg_log(f"❌ 轉換失敗\n錯誤：{str(e)[:200]}")
+        tg_log(f"❌ 轉換失敗\n檔案：{orig_filename or '未知'}\n錯誤：{str(e)[:200]}")
         job.update(status='error', error=str(e), progress=0)
 
 
@@ -296,7 +297,8 @@ async def start_process(video: UploadFile = File(...), source_lang: str = Form('
         'output_path': output_path,
         'error': None,
     }
-    t = threading.Thread(target=process_job, args=(job_id, input_path, output_path, source_lang), daemon=True)
+    orig_filename = video.filename or ''
+    t = threading.Thread(target=process_job, args=(job_id, input_path, output_path, source_lang, orig_filename), daemon=True)
     t.start()
     return JSONResponse({'job_id': job_id})
 
