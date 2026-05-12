@@ -213,6 +213,22 @@
       border-top: 1px solid var(--border);
     }
 
+    .already-bought {
+      margin-top: 24px;
+      display: flex; align-items: center; gap: 10px;
+      justify-content: center;
+    }
+    .already-bought p {
+      font-size: 14px; color: var(--muted);
+    }
+    .already-bought a {
+      display: inline-flex; align-items: center; gap: 6px;
+      font-size: 14px; font-weight: 600; color: var(--brand);
+      text-decoration: none; border-bottom: 1px solid #bfdbfe;
+      padding-bottom: 1px; transition: color 0.15s;
+    }
+    .already-bought a:hover { color: var(--brand-dark); }
+
     @media (max-width: 600px) {
       nav { padding: 0 16px; }
       .hero { padding: 72px 16px 60px; }
@@ -368,6 +384,17 @@
     </svg>
     有意者請洽詢
   </a>
+  <div class="already-bought">
+    <p>已購買？</p>
+    <a href="https://github.com/jacky6658/subtitle-to-traditional/releases/latest/download/AIJobvideo.zip">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="16" height="16">
+        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+        <polyline points="7 10 12 15 17 10"/>
+        <line x1="12" y1="15" x2="12" y2="3"/>
+      </svg>
+      點此下載工具
+    </a>
+  </div>
 </section>
 
 <!-- Footer -->
